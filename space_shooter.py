@@ -1,29 +1,28 @@
 __author__ = "Marlon"
 
 import os
-import pygame
 import random
-import pyganim
 import time
 
-from pygame.locals import RLEACCEL, SRCALPHA
+import pygame
+from pygame.locals import SRCALPHA
+
+import pyganim
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-BLACK = (  0,   0,   0)
+BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
-RED   = (255,   0,   0)
-
+RED = (255, 0, 0)
 
 SCREEN_WIDTH = 1024
 SCREEN_HEIGHT = 640
 
-METEORS_BROWN = ["meteorBrown_big1.png","meteorBrown_big2.png","meteorBrown_big3.png","meteorBrown_big4.png",
-            "meteorBrown_med1.png","meteorBrown_med3.png","meteorBrown_small1.png","meteorBrown_small2.png",
-            "meteorBrown_tiny1.png","meteorBrown_tiny2.png"]
+METEORS_BROWN = ["meteorBrown_big1.png", "meteorBrown_big2.png", "meteorBrown_big3.png", "meteorBrown_big4.png",
+                 "meteorBrown_med1.png", "meteorBrown_med3.png"]
 
 LASERS = ["laserBlue01.png", "laserBlue02.png", "laserBlue03.png", "laserBlue04.png", "laserBlue05.png",
-          "laserBlue06.png", "laserBlue07.png", "laserBlue08.png", "laserBlue09.png", "laserBlue10.png",]
+          "laserBlue06.png", "laserBlue07.png", "laserBlue08.png", "laserBlue09.png", "laserBlue10.png", ]
 
 
 def load_image(name, colorkey=None, alpha=False):
@@ -33,11 +32,13 @@ def load_image(name, colorkey=None, alpha=False):
     except pygame.error as message:
         print('Cannot load image:', name)
         raise SystemExit(message)
-    if alpha:image = image.convert_alpha()
-    else:image=image.convert()
+    if alpha:
+        image = image.convert_alpha()
+    else:
+        image = image.convert()
     if colorkey is not None:
         if colorkey is -1:
-            colorkey = image.get_at((0,0))
+            colorkey = image.get_at((0, 0))
         image.set_colorkey(colorkey, SRCALPHA)
     return image, image.get_rect()
 
@@ -55,25 +56,33 @@ class Meteoros(pygame.sprite.Sprite):
         self.rect.y += 1
 
         # If block is too far down, reset to top of screen.
-        if self.rect.y > 650:
+        if self.rect.y > SCREEN_HEIGHT:
             self.reset_pos()
 
     def reset_pos(self):
         """ Reset position to the top of the screen, at a random x location.
         Called by update() or the main program loop if there is a collision.
         """
-        self.rect.y = random.randrange(-300, -20)
-        self.rect.x = random.randrange(0, SCREEN_WIDTH)
+        self.rect.y = random.randrange(-400, -70)
+        x = random.randrange(0, SCREEN_WIDTH)
+        if x + self.image.get_size()[0] > SCREEN_WIDTH:
+            self.rect.x = x - self.image.get_size()[0]
+        elif x - self.image.get_size()[0] < SCREEN_WIDTH:
+            self.rect.x = x + self.image.get_size()[0]
+        else:
+            self.rect.x = x
 
 
 class Nave(pygame.sprite.Sprite):
     last_shot = 0
-    shot_delay = 0.1;
+    shot_delay = 0.1
     projectile_image = None
 
     def __init__(self, alpha=True, projectile_list=pygame.sprite.Group()):
         super().__init__()
         self.image, self.rect = load_image(os.path.join('PNG', 'playerShip1_blue.png'), alpha=alpha)
+        self.rect.x = SCREEN_WIDTH / 2 - self.image.get_size()[1]
+        self.rect.y = SCREEN_HEIGHT - self.image.get_size()[0]
         self.mask = pygame.mask.from_surface(self.image, 0)
         self.projectile_list = projectile_list
 
@@ -81,15 +90,19 @@ class Nave(pygame.sprite.Sprite):
         key = pygame.key.get_pressed()
         dist = 10  # distance moved in 1 frame, try changing it to 5
         if key[pygame.K_DOWN]:  # down key
-            self.rect.y += dist  # move down
+            if self.rect.y < SCREEN_HEIGHT - self.image.get_size()[1]:
+                self.rect.y += dist  # move down
         elif key[pygame.K_UP]:  # up key
-            self.rect.y -= dist  # move up
+            if self.rect.y > 0:
+                self.rect.y -= dist  # move up
         if key[pygame.K_RIGHT]:  # right key
-            self.rect.x += dist  # move right
-            self.speed_x = dist
+            if self.rect.x < SCREEN_WIDTH - self.image.get_size()[0]:
+                self.rect.x += dist  # move right
+                # self.speed_x = dist
         elif key[pygame.K_LEFT]:  # left key
-            self.rect.x -= dist  # move left
-            self.speed_x = dist
+            if self.rect.x > 0:
+                self.rect.x -= dist  # move left
+                # self.speed_x = dist
 
         if key[pygame.K_SPACE]:
             if time.time() - self.last_shot > self.shot_delay:
@@ -110,6 +123,8 @@ class Missile(pygame.sprite.Sprite):
     def update(self):
         self.rect.x += self.speed_x
         self.rect.y += self.speed_y
+        if self.rect.y < -5:
+            self.kill()
 
 
 class Projectile(Missile):
@@ -118,14 +133,13 @@ class Projectile(Missile):
         self.mask = pygame.mask.from_surface(self.image)
 
 
-class Background():
+class Background:
     def __init__(self):
         self.image, self.rect = load_image(os.path.join("PNG", "Backgrounds", "black_m.png"))
         self.background_size = self.image.get_size()
 
 
-class Game():
-
+class Game:
     x = 0
     y = 0
     x1 = 0
@@ -146,8 +160,14 @@ class Game():
             meteor = Meteoros(name)
 
             # Set a random location for the block
-            meteor.rect.x = random.randrange(SCREEN_WIDTH)
-            meteor.rect.y = 0
+            x = random.randrange(SCREEN_WIDTH)
+            if x + meteor.image.get_size()[0] > SCREEN_WIDTH:
+                meteor.rect.x = x - meteor.image.get_size()[0]
+            elif x - meteor.image.get_size()[0] < SCREEN_WIDTH:
+                meteor.rect.x = x + meteor.image.get_size()[0]
+            else:
+                meteor.rect.x = x
+            meteor.rect.y = -50
 
             # Add the block to the list of objects
             self.meteor_list.add(meteor)
@@ -192,10 +212,10 @@ class Game():
             for m in meteor:
                 m.reset_pos()
 
-        for block in meteors_hit_list:
             self.score += 1
             print(self.score)
 
+        for block in meteors_hit_list:
             block.reset_pos()
 
         self.all_sprites_list.draw(screen)
